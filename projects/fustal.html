@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="./style.css" />
+<title></title>
+</head>
+<body>
+<h1 id="fustal">FUSTAL</h1>
+<p><strong>FUSTAL</strong> is a statistics library that I wrote as my Senior year project
+for my data science major at Valparaiso Univeristy. It is written entirely
+in <a href="https://futhark-lang.org/">futhark</a>, which is a functional programming
+language designed for number crunching. This library also includes a built
+in test-suite comparing it&#8217;s results against R aswell as documentation.</p>
+<h2 id="motivation">Motivation</h2>
+<p>One of the key motivators for this project was to be able to demonstrate
+that C, C++, and Fortran are not <em>required</em> for this kind of computing,
+since most popular statistical library backend are written in one of these
+three languages. There are exceptions to this, such as Haskell&#8217;s
+<a href="https://hackage.haskell.org/package/statistics">statistics</a> library, but
+generally speaking these libraries are written in low level languages.</p>
+<p>This is typically the right call, since these languages don&#8217;t suffer
+from the high amounts of runtime overhead that other languages have.
+However, Futhark presents a little wrinkle in this model since it is designed
+not as an application language, but rather a library language, which allows
+it to forgo some of the nicities of more general purpose languages like
+Haskell, but in exchange allows you to compile your code to be used in
+other languages using the C foreign function interface.</p>
+<p>In addition to being a library focused language, futhark also allows you to
+trivially compile your code for running on the GPU, with CUDA and OpenCL
+serving as valid backends, with there being a potential for
+<a href="https://github.com/diku-dk/futhark/issues/1856">Vulkan</a> in the future.</p>
+<h2 id="fustal-itself">FUSTAL Itself</h2>
+<h3 id="features">Features</h3>
+<h3 id="test-suite">Test-Suite</h3>
+<p>The test suite is divided into three parts: the python script, the
+R script, and the shell script that computes the differences.</p>
+<p>Admittedly, most of this could likley have been done in Python, however I
+did not want to hurt the chances of R by using R through some kind of
+library wrapper that would run the R code. So instead each test script
+contains</p>
+<h3 id="results">Results</h3>
+<p>FUSTAL generally outperforms R when it comes to the core statisitical
+procedures. It is important to note that all of these benchmarks should
+be taken with a few heavy grains of salt, since R does provide additional
+information in addition to the running of statistical tests (such as the
+p-value, etc).</p>
+<h2 id="poster">Poster</h2>
+<p><img src="./assets/FUSTAL_Poster.png" alt="Here's the poster I made for the project." /></p>
+<h2 id="more">More</h2>
+</body>
+</html>
