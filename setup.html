@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="./style.css" />
+<title></title>
+</head>
+<body>
+<p>Here&#8217;s a brief tour of my Linux&#47;NIX setup. (Plus some software recommendations.)</p>
+<p>If you just want my dotfiles, they are available <a href="https://github.com/echawk/dots">here</a>.</p>
+<h1 id="distro">distro</h1>
+<p><a href="http://kisscommunity.org/">Kiss Linux</a>, honestly there isn&#8217;t anything better.
+I remember stumbling on it all the way back in early 2020, however I didn&#8217;t
+start using it until mid 2021 (when I had enough time to go through configuring
+the kernel for the first time). I like the distro <em>so</em> much that
+<a href="https://github.com/echawk/kiss-personal">I</a>
+<a href="https://github.com/echawk/kiss-xorg">maintain</a>
+<a href="https://github.com/echawk/kiss-tex">multiple</a>
+<a href="https://github.com/echawk/kiss-repos">repos</a>
+<a href="https://github.com/echawk/kiss-java-boot">for</a>
+<a href="https://github.com/echawk/kiss-spec">it</a>.</p>
+<p>If you want absolute control over your system, along with the best port system,
+there really is no other option.</p>
+<h2 id="honorable-mentions">honorable mentions</h2>
+<p>If there was a world where kiss did not exist, and my tolerance for reading
+random wiki articles was higher, I would likely use
+<a href="https://www.gentoo.org/">gentoo</a>, since I am fully on the source-based distro
+train.</p>
+<p>For binary distros though, <a href="https://voidlinux.org/">Void</a>, <a href="https://artixlinux.org/">Artix</a>, and <a href="https://guix.gnu.org/">Guix</a> are promising alternatives. Just
+try to avoid <a href="https://nosystemd.org/">systemd</a> &#38; <a href="https://without-systemd.org/public/gnomeasia2014.pdf">Red Hat</a> when you can :)</p>
+<p>The *BSDs are also a good option!</p>
+<h1 id="editor">editor</h1>
+<p><a href="https://www.gnu.org/software/emacs/">Emacs</a> is far and away the best text editor
+I have used. I do need to mention that I do use Vim bindings, since I grew up
+on vim, since I&#8217;ve been using it since I was 15. I chose to move over to Emacs
+after I grew frustrated with how tedious &#38; arcane it was to develop my own plugins.</p>
+<p>Emacs isn&#8217;t really an editor in the traditional sense. It, like lisp, changes
+the way that you think about interacting with your computer. Much of life
+on the computer can be navigated through text buffers.
+<a href="https://youtu.be/urcL86UpqZc?feature=shared&amp;t=210">Emacs optimizes for this way of working</a>.</p>
+<h2 id="honorable-mentions-1">honorable mentions</h2>
+<p><a href="https://neovim.io/">neovim</a> - I used to use this way back in the day, and I
+even still have <a href="https://github.com/ehawkvu/dots/tree/master/neovim/.config/nvim">a barebones config</a> still kicking around.
+I ended up leaving neovim because of the community, not the lack thereof, but
+the high volume of medium quality, re-inventions of the wheel.</p>
+<h1 id="windowing-system">windowing system</h1>
+<h3 id="for-x11">For X11:</h3>
+<ul>
+<li><a href="http://stumpwm.github.io/">stumpwm</a></li>
+<li><a href="https://github.com/emacs-exwm/exwm">EXWM</a> (if using Emacs)</li>
+</ul>
+<p>I personally use both of these window managers, however each has a slightly
+different use case. I use stumpwm on my main laptop&#47;development machine,
+since I will have quicklisp and all of the dependencies already installed.
+EXWM is a better choice on binary distros, since nearly every Linux distro has
+Emacs packaged in their repos.</p>
+<h3 id="for-wayland">For Wayland:</h3>
+<ul>
+<li><a href="https://codeberg.org/dwl/dwl">dwl</a></li>
+</ul>
+<p>If Wayland works for your machine, and you&#8217;re on the Wayland train,
+dwl is one of the better compositors out there. It&#8217;s pretty straight
+forward to configure (much like dwm).</p>
+<h2 id="honorable-mentions-2">honorable mentions</h2>
+<h3 id="for-x11-1">For X11:</h3>
+<p>I have heard good things about <a href="https://xmonad.org/">xmonad</a>, which I hope to try out in the
+near future, and I have historically been a <a href="https://dwm.suckless.org/">dwm</a> user.</p>
+<h3 id="for-wayland-1">For Wayland:</h3>
+<p><a href="https://github.com/stumpwm/mahogany">mahogany</a>, would be the recommended
+Wayland display manager, if it were a bit farther along in it&#8217;s development.
+It&#8217;s really just waiting for a lisp hacker to get frustrated enough with X11
+screen tearing before it&#8217;ll be amazing.</p>
+<h1 id="programming-language">programming language</h1>
+<p>I tend to use whatever is best suited to solve the specific problem.</p>
+<p>If I <em>had</em> to pick a favorite, I&#8217;m definitely partial to the Lisp
+family of languages.</p>
+<h2 id="recommendations">recommendations</h2>
+<p>If you&#8217;re looking for languages to learn, there really aren&#8217;t any &#8220;bad&#8221; options.
+If anything, languages really are only a vessel to learn the embedded paradigms
+that they are well suited to express. So I would pick any language who&#8217;s
+general paradigm is different from the current paradigms that you know already.</p>
+<p>If you&#8217;re a C programmer, try out ruby. Or if you know Java, try out Clojure.
+The real goal is to expand your breadth of knowledge and increase the different
+models of thought that you can use to solve problems.</p>
+<p>Here is a undoubtedly controversial list of paradigms with an associated language.</p>
+<ul>
+<li>Imperative: C</li>
+<li>Object-Oriented: <a href="https://www.ruby-lang.org/en/">ruby</a></li>
+<li>Concurrent: <a href="https://www.erlang.org/">Erlang</a></li>
+<li>Functional: <a href="https://smlfamily.github.io/">ML</a>&#47;<a href="https://llthw.common-lisp.dev/">Lisp</a></li>
+<li>Meta: Lisp&#47;<a href="https://forth-standard.org/">Forth</a></li>
+<li>Logic: <a href="https://www.metalevel.at/prolog">Prolog</a></li>
+</ul>
+<p>The controversy is only due to PL people being very opinionated as to what the
+ideal language to learn each of the paradigms is. The more important aspect
+of programming languages is to learn the paradigms and semantics, and the
+syntax will come more naturally. Ultimately syntax errors will get caught by the
+compiler anyways :)</p>
+<p>Ultimately it&#8217;s more important to learn how to <em>program</em> than to learn any
+programming language. The ideas transcend the languages that they
+are expressed in.</p>
+<p>I&#8217;d also say that I am <em>entirely uninterested</em> in languages that have no clear
+<a href="https://guix.gnu.org/en/blog/2023/the-full-source-bootstrap-building-from-source-all-the-way-down/">bootstrap chain</a>, and ones that have heaps of syntax. This stems from
+<em><a href="https://www.cs.cmu.edu/~rdriley/487/papers/Thompson_1984_ReflectionsonTrustingTrust.pdf">reflections on Trusting Trust</a></em>,
+as well as my general aversion to the over-engineering of <em>typically</em> simple
+concepts. You can imagine what languages this reasoning applies to.</p>
+<p>I&#8217;m almost certain to expand on this further in a future blog article&#8230;</p>
+</body>
+</html>
+<h2 id="links">Links</h2>
