@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="./style.css" />
+<title></title>
+</head>
+<body>
+<h1 id="lesspass-cl---an-implementation-of-lesspass-in-common-lisp">lesspass-cl - An implementation of lesspass in Common Lisp</h1>
+<h2 id="motivation">motivation</h2>
+<p>I really wanted to stop being dependent on other people for my passwords.
+Simple as that really - I have been using a lesspass technique for saving
+my passwords and I really have enjoyed the process of using it, and it has
+been <em>way</em> nicer and more convenient than writing all of my passwords down
+on paper and keeping them in a folder.</p>
+<p>However, what really was the impetus to start working on this library was
+the archiving of the <a href="https://github.com/monolifed/lpcli">implementation of lesspass</a>
+that I was using at the time. While not immediately a problem, it does raise
+some concerns about the future security of the project.</p>
+<p>And while sure, there are other implementations of lesspass out there, such
+as <a href="https://github.com/Bannerets/hlesspass">hlesspass</a>, there is something
+comforting about using your own code.</p>
+<h2 id="what-is-lesspass-anyways">what is lesspass anyways?</h2>
+<p>Lesspass describes itself as a <em>stateless</em> password manager. While this is <em>mostly</em>
+true, there are some little caveats. Yes, it is true that there is not some database
+file (like in keypass, or any of that ilk) that you have to <em>protect with your life</em>
+to ensure that it stays around. However, it does have state for other things.</p>
+<p>Instead of carrying around that database file everywhere, you carry some pretty
+trivial information about the password itself in your <em>brain</em>.</p>
+<p>You need to have the following info stored somewhere in those few cubic centimeters:</p>
+<ul>
+<li>The site itself</li>
+<li>The login</li>
+<li>What character sets that the site uses (one or more of lowercase letters, uppercase letters, digits, and symbols)</li>
+<li>The length of the password</li>
+<li>The password &#8220;count&#8221; (you can increment this if that password gets compromised in a data breach)</li>
+<li>Your masterpassword</li>
+</ul>
+<p><em>-Or-</em> you can write the basic information on <em>paper</em> and keep the masterpassword <em>only</em> in your head. Choice is yours really.</p>
+<p>It&#8217;s a pretty clever idea, and one that is not even exclusive to lesspass.
+There&#8217;s <a href="https://spectre.app/">spectre</a> which takes this idea to an even more
+minimal extreme.</p>
+<h3 id="the-algorithm">the algorithm</h3>
+<p>Rather surprisingly, I didn&#8217;t really find a good description of the actual algorithm anywhere
+when I was writing this library, I just read the <a href="https://github.com/lesspass/lesspass/blob/main/cli/lesspass/password.py">source</a>
+of the python implementation and went from there. Maybe there is a good description of it, and if
+I find it, I&#8217;ll add it to this section.</p>
+<p>However, for other people who are interested, I&#8217;ll breakdown each component in
+pseudo-code:</p>
+<p>First is the entropy computation:</p>
+<pre><code>fn compute_entropy (pass_profile, master_pass) = {
+  # Salt string is the site with the login and counter (as hex)
+  salt = pass_profile.site \
+  + pass_profile.login \
+  + pass_profile.counter.as_hex().lowercase()
+
+  bytes = pbkdf2_hash_pasword(
+    master_pass.to_bytes(),
+    salt.to_bytes(),
+    "sha265",
+    100000)
+
+  return bytes.as_hex().as_integer()
+}
+</code></pre>
+<p>This entropy is meant to serve as a &#8220;random&#8221; number which has entropy &#8220;consumed&#8221;
+throughout the computation.</p>
+<p>Naturally, then, we need a way to consume the entropy that we have:</p>
+<pre><code>fn consume_entropy (password, current_entropy, set_of_chars, max_length) = {
+  if (password.length() &#62;= max_length) {
+    return password, max_length
+  } else {
+    quotient, remainder = divmod(current_entropy, set_of_chars.length())
+    return consume_entropy(
+      password + set_of_chars[remainder],
+      quotient,
+      set_of_chars,
+      max_length
+    )
+  }
+}
+</code></pre>
+<p>The consume entropy function will always generate a password of length
+&#8220;max_length&#8221;, and will grab a bunch of characters at random. We do <em>not</em>
+have any assurances though that it will select one of each type. Those
+being <code>lowercase</code>, <code>uppercase</code>, <code>digits</code>, and <code>symbols</code>.</p>
+<p>So, we need a way to use our entropy to get a character from each rule itself:</p>
+<pre><code>fn get_one_char_per_rule (current_entropy, rules) = {
+  ent = current_entropy
+  one_char_per_rules = ""
+
+  for (rule in rules) {
+    available_chars = rule-to-charset(rule)
+    char, ent       = consume_entropy("", ent, available_chars, 1)
+    one_char_per_rules += char
+  }
+  return one_char_per_rules, ent
+}
+</code></pre>
+<p>This will return us a string of length <code>rules.length()</code>, so a max of 4,
+with the string always having a lowercase be first, uppercase being second,
+digits being third, and a symbol being fourth. (This is the ordering for
+the case when we have all four rules there, if one is missing, then naturally
+the character for it will be omitted).</p>
+<p>While we could just append this string to the end of a generated password
+(thus ensuring that we have at least one of every character class in the
+password), that seems <em>wrong</em>. So instead, we can use our current entropy
+value to insert each character into the password.</p>
+<pre><code>fn insert_string_pseudo_randomly (password, current_entropy, string) = {
+  pass = password
+  entr = current_entropy
+
+  for (char in string) {
+    quotient, remainder = divmod(entr, pass.length())
+    pass = pass.insert_at(remainder, char)
+    entr = quotient
+  }
+  return pass
+}
+</code></pre>
+<p>We don&#8217;t need to return the entropy here, since the password generation at this
+point is over, and we don&#8217;t need that value anymore.</p>
+<p>So now, to tie it all together, the actual creation of the password looks
+something like this:</p>
+<pre><code>fn generate_password(password_profile, master_password) = {
+  entropy = calculate_entropy(password_profile, master_password)
+
+  rules        = password_profile.rules.sort()
+  set_of_chars = rules_to_charset(rules)
+
+  password, entropy = consume_entropy("",
+                                      entropy,
+                                      set_of_chars
+                                      password_profile.length - rules.length()
+                                      )
+  chars_to_add, entropy = get_one_char_per_rule(entropy, rules)
+  final_pass = insert_string_pseudo_randomly(password, entropy, chars_to_add)
+
+  return final_pass
+}
+</code></pre>
+<p>And that&#8217;s really it. Obviously this code isn&#8217;t executable, but it should
+be illustrative enough for you to be able to implement it in
+<code>&#60;your language of choice&#62;</code>, since it&#8217;s not a very complex algorithm.</p>
+<h2 id="development-process">development process</h2>
+<p>Developing a lisp application was a good bit different compared to other programming
+languages that I&#8217;ve used before. I definitely wasn&#8217;t new to lisp in general, but
+new to the process of having to require libraries and to make sure that my library
+was actually usable.</p>
+<p>And since I knew that I wanted to write a library and test suite from the start,
+I had to jump into the deep end and learn enough of <a href="https://asdf.common-lisp.dev/">ASDF</a> to get my library
+to be <code>ql:quickload</code>-able.</p>
+<p>I will say that it was somewhat tricky to figure out what I needed to do in order
+for the test suite to be usable via <code>asdf:test-system</code>, but it turned out to be simple in
+the end.</p>
+<h2 id="contrib">contrib</h2>
+<p>In addition to implementing lesspass v2, I also wrote a little companion
+program,
+<a href="https://raw.githubusercontent.com/echawk/lesspass-cl/master/contrib/lsps.lisp">lsps</a>
+which allows for passwords to be generated interactively (outside of the
+CL repl).</p>
+<p>While I initially wrote lsps as a sbcl script, I instead rewrote it to be able
+to be &#8220;image dumped&#8221; into an executable using a
+<a href="https://raw.githubusercontent.com/echawk/lesspass-cl/master/contrib/build-lsps">script</a>.
+That way, you can compile lsps with other lisp implementations, provided they
+are supported by <code>uiop:dump-image</code>.</p>
+<h3 id="lsps">lsps</h3>
+<p>lsps, as mentioned above, is a helper for using the lesspass library. It
+allows you to specify every piece of information through the command line,
+or it can interactively prompt the user for the needed information.</p>
+<p>Additionally, it supports reading &#8220;saved&#8221; information for specific sites,
+(excluding the login, incase someone were to make their file public by accident)
+using a semi-colon separated CSV in <code>$XDG_CONFIG_HOME&#47;lsps&#47;sites</code>.</p>
+<h2 id="concluding-thoughts">concluding thoughts</h2>
+<p><a href="https://github.com/echawk/lesspass-cl">lesspass-cl</a> was my first foray into
+the world of Common Lisp development
+outside of configuring <a href="https://stumpwm.github.io/">stumpwm</a> and other
+miscellaneous scripts.</p>
+<p>I have to say, that the experience has left me pretty well convinced that
+Common Lisp is one of the better choices when it comes to writing actual
+end user applications. Granted, while lesspass-cl is not some gigantic
+100kLOC project, with 30+ developers, I still think that the overall
+experience of developing an application in Common Lisp can scale up to
+teams that large.</p>
+<p>See <a href="https://github.com/atlas-engineer/nyxt">nyxt</a> for an example of a
+Common Lisp project that <em>is</em> that big!</p>
+<h1 id="thoughts-on-using-cl">thoughts on using CL</h1>
+<h2 id="the-good">the good</h2>
+<h3 id="libraries">libraries</h3>
+<p>The library selections are actually <em>quite good</em>! I was definitely worried that
+there would be a shortage of libraries, but there is quite a number of
+well written code out in the wild. I will say, that some of the libraries
+can be quite old (it is not surprising to see commits from 5 years ago), but
+that doesn&#8217;t mean that the library doesn&#8217;t work.</p>
+<h3 id="repl">repl</h3>
+<p>I was already a lisper before I started this project, so I was already sold
+on repl-driven-development, however this project showed me just <em>how nice</em>
+life is over in CL land. Slime and Sly are both <em>fantastic</em> plugins and
+make writing CL a breeze!</p>
+<h3 id="compilers">compiler(s)</h3>
+<p>One of the things that I think most people take for granted is having
+<em>multiple</em> compilers for a language. While almost no language comes close
+to C when it comes to the number of compilers, Common Lisp has four very well
+established open source compilers, with a fifth and sixth in development.</p>
+<p>These are the open source compilers (still maintained) that I am aware of:</p>
+<ul>
+<li><a href="https://sbcl.org">sbcl</a></li>
+<li><a href="https://ecl.common-lisp.dev/">ecl</a></li>
+<li><a href="https://ccl.clozure.com/">ccl</a></li>
+<li><a href="https://armedbear.common-lisp.dev/">abcl</a></li>
+<li><a href="https://github.com/clasp-developers/clasp">clasp</a></li>
+<li><a href="https://github.com/robert-strandh/SICL">sicl</a></li>
+</ul>
+<h2 id="the-ehh">the ehh</h2>
+<h3 id="building-executables">building executables</h3>
+<p>I do feel bad for putting this in the &#8220;ehh&#8221; category, but for most people,
+the workflow for building binaries is a little different. Definitely <em>not</em>
+more difficult, just <em>different</em>.</p>
+<p>Instead of breaking down a program into a bunch of little compilation units,
+and linking them all together, you instead make a core dump of the program
+which results in an
+&#8220;<a href="https://www.sbcl.org/manual/#Saving-a-Core-Image">image</a>&#8221;
+that you can ship to customers.</p>
+<p>There really isn&#8217;t a ton to say here, other than adjusting your workflow to
+reflect the &#8220;Lisp way&#8221; of doing things.</p>
+<p>I will say, one potential upside (or downside depending on how you view
+the &#8220;customer&#8221;) is that the shipped executables contain <em>everything</em> that
+was accessible in the common lisp image. This includes the repl, and all of
+the libraries that were loaded. It is possible to actually start up a
+swank&#47;slynk server and connect an editor to the application, and modify
+it in <em>real-time</em>.
+<a href="https://www.grammarly.com/blog/engineering/running-lisp-in-production/">Grammarly has even used this exact technique in production.</a></p>
+<p>It&#8217;s mostly a process of learning how things are done.</p>
+<h2 id="the-bad">the bad</h2>
+<h3 id="quicklisp-https-support">quicklisp https support</h3>
+<p>Quicklisp doesn&#8217;t download libraries using https - while this is done in an
+effort to make quicklisp available on all conceivable Lisp implementations,
+this is obviously a problem with regards to security.</p>
+<p>There are ways to fix this broken behavior, but each has it&#8217;s own caveats.</p>
+<p>Arguably the least intrusive solution is to simply follow this
+<a href="https://web.archive.org/web/20240313162903/https://hiphish.github.io/blog/2022/03/19/securing-quicklisp-through-mitmproxy/">blog post</a>
+discussing how to use <a href="https://github.com/mitmproxy/mitmproxy">mitmproxy</a>
+to force https for all local connections, and to simply run mitmproxy when
+downloading libraries.</p>
+<p>However, this should not need to be done <em>at all</em> for simply the secure
+downloading of libraries for a programming language. This should simply
+be the <em>default</em> and it is really unfortunate that it isn&#8217;t.</p>
+<p>NOTE: you can also checkout <a href="https://github.com/rudolfochrist/ql-https">ql-https</a>
+which is a lisp package for doing this without mitmproxy.</p>
+<h3 id="dumped-images-are-rather-large">dumped images are rather large</h3>
+<p>;; FIXME: rewrite</p>
+<p>When dumping images to executables, the files they produce are rather hefty.
+For example, dumping lsps, even with compression enabled, still produces a
+17MB file! While this is fine on modern systems with modern amounts of storage
+and ram, it still does seem somewhat wasteful to me, to be forced to ship
+the full lisp stack every time you want to make an executable.</p>
+<p><strong>NOTE:</strong> This is only really a problem on all of the <em>free</em> lisp implementations,
+all of the proprietary implementations allow you to use a technique called
+&#8220;tree-shaking&#8221; to remove all of the unused functions and code from your
+executable resulting in a <em>much</em> smaller image size.</p>
+<p>You can also check out roswell&#8217;s
+<a href="https://github.com/roswell/roswell/blob/master/lisp/dump-sbcl.lisp">tree-shaker</a>
+if you are interested in using roswell (or have lisp installed via roswell).
+I personally don&#8217;t use roswell, since I haven&#8217;t felt the need for it.
+It also forces you to use it&#8217;s provided lisp binaries AFAICT, so it&#8217;s a little
+redundant for me.</p>
+<h2 id="ideas-for-improvement">ideas for improvement</h2>
+<p>Outside of making the downloading of libraries safer (using https),
+I would say that there isn&#8217;t a <em>ton</em> of need for improvement.</p>
+<p>There could be some benefit to continuing the development of the command line
+library managers, <a href="https://github.com/fukamachi/qlot">qlot</a> or
+<a href="https://github.com/roswell/roswell">ros</a> come to mind. However, the biggest
+issue with these tools is that they are inherently outside the lisp repl,
+which is the best place to manage your projects anyways.</p>
+<p>I think that if someone where to implement something akin to python&#8217;s
+<a href="https://docs.python.org/3/library/venv.html">virtual environments</a>
+that would be a <em>huge</em> boost in productivity,
+while allowing for the actual vendoring of libraries, which currently is
+done most commonly through using git submodules (yuck).</p>
+<p>Admittedly, I don&#8217;t use either qlot or ros, since I find the repl to be more
+than adequate for most of my needs, but writing command line tools would make
+it easier to integrate Lisp into existing CI infrastructures.</p>
+<p>Having tree-shaking be more accessible to people who do not use roswell would
+be rather nice aswell.</p>
+</body>
+</html>
