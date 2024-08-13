@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="./style.css" />
+<title></title>
+</head>
+<body>
+<h1 id="automagically-installing-quicklisp">automagically installing quicklisp</h1>
+<p>A while back I was searching for a way to have <a href="https://www.quicklisp.org/beta/">quicklisp</a>
+be automatically installed when using sbcl (and friends),
+but I wasn&#8217;t really able to find a code snippet that I
+could add to my <code>~&#47;.sbclrc</code>.</p>
+<p>However, I wrote the following code snippet a couple months
+back, and have now successfully used it on multiple *NIX
+systems to great success, so I figured it warrants it&#8217;s own
+small blog post.</p>
+<p>Here&#8217;s the snippet:</p>
+<pre><code>(require &#39;asdf)
+(asdf:load-system :uiop)
+
+(defpackage :quicklisp-quickstart
+  (:use :cl)
+  (:export :install))
+(in-package :quicklisp-quickstart)
+(defun install () t)
+
+(in-package :cl-user)
+
+#-QUICKLISP
+(let ((quicklisp-init (merge-pathnames "quicklisp&#47;setup.lisp"
+                                       (user-homedir-pathname))))
+  (unless (probe-file quicklisp-init)
+    (uiop:run-program "curl -O https:&#47;&#47;beta.quicklisp.org&#47;quicklisp.lisp"
+                      :output *standard-output*)
+    (load "quicklisp.lisp")
+    (quicklisp-quickstart:install)
+    (uiop:run-program "rm quicklisp.lisp"))
+
+  (when (probe-file quicklisp-init)
+    (load quicklisp-init)))
+</code></pre>
+<p>The only requirement for this snippet is that <code>curl</code> is available
+in the system&#8217;s <code>$PATH</code>. Pretty slick!</p>
+<p>If you want to see the rest of my <code>.sbclrc</code>, you can view it
+<a href="https://github.com/echawk/dots/blob/master/stumpwm/.sbclrc">here</a></p>
+<h2 id="other-lisps">other lisps&#8230;</h2>
+<p>This snippet also works for <code>ecl</code>, <code>ccl</code>, and <code>abcl</code>. I&#8217;m sure
+others work as well, but I have tested those three specifically.</p>
+<h2 id="update-8-12-2024">update 8-12-2024</h2>
+<p>Users may also be interested in adding ultralisp to their list
+of quicklisp dists. Here is the updated snippet which will
+also automatically install ultralisp:</p>
+<pre><code>(defpackage :quicklisp-quickstart
+  (:use :cl)
+  (:export :install))
+(in-package :quicklisp-quickstart)
+(defun install () t)
+
+(defpackage :ql-dist
+  (:use :cl)
+  (:export :install-dist :find-dist))
+(in-package :ql-dist)
+(defun install-dist (arg1 arg2 arg3) (list arg1 arg2 arg3))
+(defun find-dist (str) str)
+
+;; Switch back to cl-user package.
+(in-package :cl-user)
+
+;;; Install quicklisp if it is not already installed.
+#-quicklisp
+(let ((quicklisp-init (merge-pathnames "quicklisp&#47;setup.lisp"
+                                       (user-homedir-pathname))))
+  (unless (probe-file quicklisp-init)
+    (uiop:run-program "curl -O https:&#47;&#47;beta.quicklisp.org&#47;quicklisp.lisp"
+                      :output *standard-output*)
+    (load "quicklisp.lisp")
+    (quicklisp-quickstart:install)
+    (uiop:run-program "rm quicklisp.lisp"))
+
+  (when (probe-file quicklisp-init)
+    (load quicklisp-init))
+
+  ;; Also install the ultralisp dist while we are at it...
+  (unless (ql-dist:find-dist "ultralisp")
+    (ql-dist:install-dist "http:&#47;&#47;dist.ultralisp.org&#47;" :prompt nil)))
+</code></pre>
+<p>Little bit more code since we have to fake more functions from quicklisp.</p>
+</body>
+</html>
