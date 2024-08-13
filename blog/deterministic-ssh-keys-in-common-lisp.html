@@ -16,123 +16,112 @@ don&#8217;t use this for anything serious&#47;public facing. If you get pwned, t
 fault.</p>
 <p>Now, with that out of the way:</p>
 <h2 id="the-beef">the <strong>beef</strong></h2>
-<p>Here&#8217;s the code:
-```</p>
-<p>;; SPDX-License-Identifier: BSD-2-Clause</p>
-<p>(ql:quickload &#8216;(:ironclad :cl-ssh-keys))</p>
-<p>(defun generate-deterministic-keys (seed-string)
-  &#8220;Will deterministically generate a ssh key pair from SEED-STRING.</p>
-<p>The ssh key pair is returned as a list, with the private key being first
-and the public key being second.&#8221;
+<p>Here&#8217;s the code:</p>
+<pre><code>;; SPDX-License-Identifier: BSD-2-Clause
+
+(ql:quickload &#39;(:ironclad :cl-ssh-keys))
+
+(defun generate-deterministic-keys (seed-string)
+  "Will deterministically generate a ssh key pair from SEED-STRING.
+
+The ssh key pair is returned as a list, with the private key being first
+and the public key being second."
   (let* ((checksum-int
-           (reduce #&#8217;+ (mapcar #&#8217;char-int (coerce seed-string &#8216;list))))
+           (reduce #&#39;+ (mapcar #&#39;char-int (coerce seed-string &#39;list))))
          (sk (ironclad:ascii-string-to-byte-array seed-string))
-         (pk (ironclad:ed25519-public-key sk))</p>
-<pre><code>     (ironclad-priv-key (ironclad:make-private-key :ed25519 :x sk :y pk))
-     (ironclad-pub-key  (ironclad:make-public-key  :ed25519 :y pk))
+         (pk (ironclad:ed25519-public-key sk))
 
-     (key-type (ssh-keys:get-key-type-or-lose :ssh-ed25519 :by :id))
+         (ironclad-priv-key (ironclad:make-private-key :ed25519 :x sk :y pk))
+         (ironclad-pub-key  (ironclad:make-public-key  :ed25519 :y pk))
 
-     (pub-key
-       (make-instance &#39;ssh-keys:ed25519-public-key
-                      :kind key-type
-                      :y (ironclad:ed25519-key-y ironclad-pub-key)))
-     (priv-key
-       (make-instance &#39;ssh-keys:ed25519-private-key
-                      :public-key pub-key
-                      :cipher-name "none"
-                      :kdf-name "none"
-                      :checksum-int checksum-int
-                      :kind key-type
-                      :y (ironclad:ed25519-key-y ironclad-priv-key)
-                      :x (ironclad:ed25519-key-x ironclad-priv-key))))
-(list priv-key pub-key)))
+         (key-type (ssh-keys:get-key-type-or-lose :ssh-ed25519 :by :id))
+
+         (pub-key
+           (make-instance &#39;ssh-keys:ed25519-public-key
+                          :kind key-type
+                          :y (ironclad:ed25519-key-y ironclad-pub-key)))
+         (priv-key
+           (make-instance &#39;ssh-keys:ed25519-private-key
+                          :public-key pub-key
+                          :cipher-name "none"
+                          :kdf-name "none"
+                          :checksum-int checksum-int
+                          :kind key-type
+                          :y (ironclad:ed25519-key-y ironclad-priv-key)
+                          :x (ironclad:ed25519-key-x ironclad-priv-key))))
+    (list priv-key pub-key)))
+
 </code></pre>
-<pre><code>
-That&#39;s it - I should mention that I had to look into the internals of how
+<p>That&#8217;s it - I should mention that I had to look into the internals of how
 cl-ssh-keys generates key pairs to get the above code, hence the license
-identifier.
-
-Otherwise the code is rather straightforward: turn our string into a byte array
-that we can use with ironclad&#39;s `make-private-key` &#38; `make-public-key`
+identifier.</p>
+<p>Otherwise the code is rather straightforward: turn our string into a byte array
+that we can use with ironclad&#8217;s <code>make-private-key</code> &#38; <code>make-public-key</code>
 functions. Then use those ed25519 keys that ironclad created as the base of our
-ssh keys.
+ssh keys.</p>
+<p>And for the obligatory example code, using the above function:</p>
+<pre><code>(defun example ()
+  (let* ((keyname  "example")
+         (seed-str "your-super-secret-seed-string-please-protect-at-all-costs")
+         (keys-lst (generate-deterministic-keys seed-str)))
 
-And for the obligatory example code, using the above function:
+    (ssh-keys:write-key-to-path
+     (first keys-lst)
+     (concatenate &#39;string (namestring (user-homedir-pathname)) ".ssh&#47;" keyname))
 
+    (ssh-keys:write-key-to-path
+     (second keys-lst)
+     (concatenate &#39;string (namestring (user-homedir-pathname)) ".ssh&#47;" keyname ".pub"))))
 </code></pre>
-<p>(defun example ()
-  (let* ((keyname  &#8220;example&#8221;)
-         (seed-str &#8220;your-super-secret-seed-string-please-protect-at-all-costs&#8221;)
-         (keys-lst (generate-deterministic-keys seed-str)))</p>
-<pre><code>(ssh-keys:write-key-to-path
- (first keys-lst)
- (concatenate &#39;string (namestring (user-homedir-pathname)) ".ssh&#47;" keyname))
-
-(ssh-keys:write-key-to-path
- (second keys-lst)
- (concatenate &#39;string (namestring (user-homedir-pathname)) ".ssh&#47;" keyname ".pub"))))
-</code></pre>
-<pre><code>
-
-While principally this is the only code that you need to get up and running, I
-thought I&#39;d give you an actually useful script. Since, well, your seed string
+<p>While principally this is the only code that you need to get up and running, I
+thought I&#8217;d give you an actually useful script. Since, well, your seed string
 has to be rather long to be of any real practical use. It would be feasible
 for an attacker to attempt to brute force your seed string if it was typed out
-by a mere human.
-
-Instead let&#39;s be a tad more clever.
-
-## the *accoutrement*
-
-### using a password manager to get a super long string
-
-If you have read articles on this blog before, you may be familiar with my
-common lisp implementation of [lesspass](https:&#47;&#47;lesspass.com), which we can
-contort to be useful for us at present.
-
-Without getting too into the weeds about how lesspass works, it is essentially a
-"password manager" that works by generating your password to a website on the
-fly when you provide it the same information.
-
-One of the other aspects that lesspass has baked in is the ability to change
-your password entirely by changing the "count", essentially just a number that
-you can increase should your password be found in a data breach.
-
-However, we can use this feature of lesspass to our advantage, by generating
+by a mere human.</p>
+<p>Instead let&#8217;s be a tad more clever.</p>
+<h2 id="the-accoutrement">the <em>accoutrement</em></h2>
+<h3 id="using-a-password-manager-to-get-a-super-long-string">using a password manager to get a super long string</h3>
+<p>If you have read articles on this blog before, you may be familiar with my
+common lisp implementation of <a href="https://lesspass.com">lesspass</a>, which we can
+contort to be useful for us at present.</p>
+<p>Without getting too into the weeds about how lesspass works, it is essentially a
+&#8220;password manager&#8221; that works by generating your password to a website on the
+fly when you provide it the same information.</p>
+<p>One of the other aspects that lesspass has baked in is the ability to change
+your password entirely by changing the &#8220;count&#8221;, essentially just a number that
+you can increase should your password be found in a data breach.</p>
+<p>However, we can use this feature of lesspass to our advantage, by generating
 multiple passwords from the same password profile, but by changing the count, we
-can get and arbitrarily long "password".
+can get and arbitrarily long &#8220;password&#8221;.</p>
+<h4 id="some-code">some code&#8230;</h4>
+<p>If we make a couple of assumptions about the password profile itself for
+lesspass we can simplify a lot of the logic:</p>
+<ul>
+<li>Assume we are using all rules (lowercase, uppercase, digits, &#38; symbols)</li>
+<li>Assume a length of 32</li>
+</ul>
+<p>And that&#8217;s about it. We can have the user provide the site and login,
+say if they wanted to have different ssh keys for different git forges.</p>
+<p>We&#8217;ll get back to the counter.</p>
+<pre><code>(ql:quickload :lesspass)
 
-#### some code...
-
-If we make a couple of assumptions about the password profile itself for
-lesspass we can simplify a lot of the logic:
-
-* Assume we are using all rules (lowercase, uppercase, digits, &#38; symbols)
-* Assume a length of 32
-
-And that&#39;s about it. We can have the user provide the site and login,
-say if they wanted to have different ssh keys for different git forges.
-
-We&#39;ll get back to the counter.
-
-</code></pre>
-<p>(ql:quickload :lesspass)</p>
-<p>;; example of our object.
+;; example of our object.
 (setq pass-prof
   (make-instance
-   &#8216;lesspass:password-profile
-   :site &#8220;&#8220;
-   :login &#8220;&#8220;
+   &#39;lesspass:password-profile
+   :site ""
+   :login ""
    :rules
-   &#8216;(lesspass:lowercase
+   &#39;(lesspass:lowercase
     lesspass:uppercase
     lesspass:digits
     lesspass:symbols)
-   :counter 1))</p>
-<p>(setf (lesspass:site-of pass-prof) &#8220;website.com&#8221;)</p>
-<p>(setf (lesspass:login-of pass-prof) &#8220;your-name?&#8221;)
-```</p>
+   :counter 1))
+
+(setf (lesspass:site-of pass-prof) "website.com")
+
+(setf (lesspass:login-of pass-prof) "your-name?")
+</code></pre>
 <p>Now before we can go about generating a big &#8220;password&#8221; we have to discuss
 what we are going to do with the <code>counter</code>. Like we mentioned before we
 can arbitrarily set counter to be anything to make a new password.</p>
@@ -189,9 +178,11 @@ our generated passwords are unique.</p>
 <h2 id="links">links</h2>
 <p>If you want to checkout the version that I use and have in my dotfiles, the link
 is <a href="https://github.com/echawk/dots/blob/master/scripts/.local/bin/det-ssh-keys.lisp">here</a></p>
-<p>And here&#8217;s the links to the related libraries:
-* <a href="https://github.com/sharplispers/ironclad">ironclad</a>
-* <a href="https://github.com/dnaeon/cl-ssh-keys">cl-ssh-keys</a>
-* <a href="https://github.com/echawk/lesspass-cl">lesspass-cl</a></p>
+<p>And here&#8217;s the links to the related libraries:</p>
+<ul>
+<li><a href="https://github.com/sharplispers/ironclad">ironclad</a></li>
+<li><a href="https://github.com/dnaeon/cl-ssh-keys">cl-ssh-keys</a></li>
+<li><a href="https://github.com/echawk/lesspass-cl">lesspass-cl</a></li>
+</ul>
 </body>
 </html>
